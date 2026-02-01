@@ -1,12 +1,12 @@
 const palette = {
-  light: '#FFCDB2',       // Peach/Apricot
-  mediumLight: '#FFB4A2', // Slightly darker peach
-  medium: '#E5989B',      // Pinkish
-  dark: '#B5828C',        // Mauve/Dark pink
+  light: '#FFEFEF',       // Peach/Apricot
+  mediumLight: '#F0EBE3', // Slightly darker peach
+  medium: '#EFD5E2',      // Pinkish
+  dark: '#F3D0D7',        // Mauve/Dark pink
   white: '#FFFFFF',
   offWhite: '#FAFAFA',
   black: '#1F2937',       // Dark gray/black
-  gray: '#9CA3AF',        // Gray
+  gray: '#7D7D7D',        // Gray
   lightGray: '#E5E7EB',   // Light gray
   error: '#EF4444',
   success: '#10B981',
@@ -17,7 +17,10 @@ export const Colors = {
   mediumLight: palette.mediumLight,
   medium: palette.medium,
   dark: palette.dark,
-  
+  white: palette.white,
+  lightGray: palette.lightGray,
+  gray: palette.gray,
+
   primary: palette.dark,
   secondary: palette.medium,
   background: palette.offWhite,
@@ -31,7 +34,7 @@ export const Colors = {
   tabIconDefault: palette.gray,
   tabIconSelected: palette.dark,
   tabBarBackground: palette.offWhite,
-  
+
   // Specific UI elements
   buttonBackground: palette.dark,
   buttonText: palette.white,

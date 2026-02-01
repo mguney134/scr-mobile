@@ -1,5 +1,14 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Search, Plus } from 'lucide-react-native';
+import {
+  Search,
+  Plus,
+  Mic,
+  ChevronDown,
+  Bookmark,
+  CircleCheck,
+  CircleAlert,
+  LayoutGrid,
+} from 'lucide-react-native';
 import {
   StyleSheet,
   Text,
@@ -24,7 +33,7 @@ import { PRODUCT_CATEGORY_LABELS, type ProductCategory } from '../types/product'
 import { Colors } from '../constants/Colors';
 
 const CATEGORIES: { key: ProductCategory | ''; label: string }[] = [
-  { key: '', label: 'Tümü' },
+  { key: '', label: 'Tüm Ürünler' },
   { key: 'cleanser', label: 'Temizleyici' },
   { key: 'toner', label: 'Tonik' },
   { key: 'serum', label: 'Serum' },
@@ -35,6 +44,14 @@ const CATEGORIES: { key: ProductCategory | ''; label: string }[] = [
   { key: 'treatment', label: 'Tedavi' },
   { key: 'other', label: 'Diğer' },
 ];
+
+// Görseldeki "match" görünümü için: ürün indexine göre yüksek/orta/düşük gösterim
+function getMatchDisplay(index: number): { percent: number; color: string; Icon: typeof CircleCheck } {
+  const mod = index % 3;
+  if (mod === 0) return { percent: 88 + (index % 10), color: Colors.success, Icon: CircleCheck };
+  if (mod === 1) return { percent: 72 + (index % 8), color: '#ea580c', Icon: CircleCheck };
+  return { percent: 42 + (index % 10), color: Colors.error, Icon: CircleAlert };
+}
 
 export default function ProductsScreen() {
   const router = useRouter();
@@ -138,12 +155,14 @@ export default function ProductsScreen() {
     }
   };
 
-  const renderProduct = ({ item }: { item: Product }) => {
+  const renderProduct = ({ item, index }: { item: Product; index: number }) => {
     const isAdding = addingToRoutine === item.id;
     const isAddingShelf = addingToShelf === item.id;
     const categoryLabel = item.category
       ? PRODUCT_CATEGORY_LABELS[item.category as ProductCategory]
       : null;
+    const match = getMatchDisplay(index);
+    const MatchIcon = match.Icon;
 
     return (
       <View style={styles.card}>
@@ -155,7 +174,7 @@ export default function ProductsScreen() {
               resizeMode="cover"
             />
           ) : (
-            <View style={styles.cardImagePlaceholder}>
+            <View style={[styles.cardImagePlaceholder, { backgroundColor: index % 3 === 0 ? '#a7f3d0' : index % 3 === 1 ? '#fde68a' : Colors.lightGray }]}>
               <Text style={styles.cardImagePlaceholderText}>
                 {item.name.charAt(0)}
               </Text>
@@ -163,6 +182,12 @@ export default function ProductsScreen() {
           )}
         </View>
         <View style={styles.cardBody}>
+          <View style={styles.matchRow}>
+            <MatchIcon size={14} color={match.color} />
+            <Text style={[styles.matchText, { color: match.color }]}>
+              %{match.percent} Eşleşme
+            </Text>
+          </View>
           <Text style={styles.cardName} numberOfLines={2}>
             {item.name}
           </Text>
@@ -178,38 +203,27 @@ export default function ProductsScreen() {
               </View>
             </View>
           ) : null}
-          <Pressable
-            style={[styles.addButton, isAdding && styles.addButtonDisabled]}
-            onPress={() => handleAddToRoutine(item)}
-            disabled={isAdding || isAddingShelf}
-          >
-            {isAdding ? (
-              <ActivityIndicator size="small" color="#fff" />
-            ) : (
-              <>
-                <Plus size={16} color={Colors.white} />
-                <Text style={styles.addButtonText}>Rutine Ekle</Text>
-              </>
-            )}
-          </Pressable>
-          <View style={styles.shelfButtons}>
+          <View style={styles.cardActions}>
             <Pressable
-              style={[styles.shelfButton, (isAdding || isAddingShelf) && styles.addButtonDisabled]}
-              onPress={() => handleAddToShelf(item, 'opened')}
+              style={[styles.addToRoutineButton, isAdding && styles.addButtonDisabled]}
+              onPress={() => handleAddToRoutine(item)}
               disabled={isAdding || isAddingShelf}
             >
-              {isAddingShelf ? (
-                <ActivityIndicator size="small" color={Colors.dark} />
+              {isAdding ? (
+                <ActivityIndicator size="small" color={Colors.text} />
               ) : (
-                <Text style={styles.shelfButtonText}>Rafıma Ekle</Text>
+                <>
+                  <Plus size={16} color={Colors.text} />
+                  <Text style={styles.addToRoutineText}>Rutine Ekle</Text>
+                </>
               )}
             </Pressable>
             <Pressable
-              style={[styles.shelfButton, styles.shelfButtonWishlist, (isAdding || isAddingShelf) && styles.addButtonDisabled]}
+              style={styles.bookmarkButton}
               onPress={() => handleAddToShelf(item, 'wishlist')}
               disabled={isAdding || isAddingShelf}
             >
-              <Text style={styles.shelfButtonTextWishlist}>İstek Listesi</Text>
+              <Bookmark size={20} color={Colors.textSecondary} />
             </Pressable>
           </View>
         </View>
@@ -219,6 +233,13 @@ export default function ProductsScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Product Finder</Text>
+        <Pressable style={styles.headerIcon} hitSlop={12}>
+          <LayoutGrid size={22} color={Colors.text} />
+        </Pressable>
+      </View>
+
       <View style={styles.searchWrap}>
         <View style={styles.searchBar}>
           <Search size={18} color={Colors.textSecondary} style={{ marginRight: 10 }} />
@@ -229,6 +250,9 @@ export default function ProductsScreen() {
             value={search}
             onChangeText={setSearch}
           />
+          <Pressable hitSlop={12} style={{ padding: 4 }}>
+            <Mic size={18} color={Colors.textSecondary} />
+          </Pressable>
         </View>
       </View>
 
@@ -239,30 +263,34 @@ export default function ProductsScreen() {
           keyExtractor={(item) => item.key || 'all'}
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.filtersContent}
-          renderItem={({ item }) => (
-            <Pressable
-              style={[
-                styles.filterPill,
-                categoryFilter === item.key && styles.filterPillActive,
-              ]}
-              onPress={() => setCategoryFilter(item.key as ProductCategory | '')}
-            >
-              <Text
+          renderItem={({ item }) => {
+            const isActive = categoryFilter === item.key;
+            return (
+              <Pressable
                 style={[
-                  styles.filterPillText,
-                  categoryFilter === item.key && styles.filterPillTextActive,
+                  styles.filterPill,
+                  isActive && styles.filterPillActive,
                 ]}
+                onPress={() => setCategoryFilter(item.key as ProductCategory | '')}
               >
-                {item.label}
-              </Text>
-            </Pressable>
-          )}
+                <Text
+                  style={[
+                    styles.filterPillText,
+                    isActive && styles.filterPillTextActive,
+                  ]}
+                >
+                  {item.label}
+                </Text>
+                {!isActive && <ChevronDown size={14} color={Colors.textSecondary} style={{ marginLeft: 4 }} />}
+              </Pressable>
+            );
+          }}
         />
       </View>
 
       <View style={styles.resultsRow}>
         <Text style={styles.resultsText}>
-          {products.length} ÜRÜN
+          {products.length} SONUÇ
           {search.trim() ? ` "${search.trim()}"` : ''}
           {categoryFilter ? ` • ${PRODUCT_CATEGORY_LABELS[categoryFilter as ProductCategory]}` : ''}
         </Text>
@@ -308,9 +336,25 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.background,
   },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 12,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: Colors.text,
+  },
+  headerIcon: {
+    padding: 4,
+  },
   searchWrap: {
     paddingHorizontal: 20,
-    paddingVertical: 12,
+    paddingBottom: 12,
   },
   searchBar: {
     flexDirection: 'row',
@@ -321,13 +365,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
   },
-  searchIcon: {
-    fontSize: 18,
-    marginRight: 10,
-  },
   searchInput: {
     flex: 1,
     paddingVertical: 12,
+    paddingHorizontal: 10,
     fontSize: 16,
     color: Colors.text,
   },
@@ -340,14 +381,19 @@ const styles = StyleSheet.create({
     paddingRight: 40,
   },
   filterPill: {
-    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 20,
-    backgroundColor: Colors.lightGray,
+    backgroundColor: Colors.card,
     marginRight: 8,
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
   filterPillActive: {
     backgroundColor: Colors.light,
+    borderColor: Colors.light,
   },
   filterPillText: {
     fontSize: 14,
@@ -355,12 +401,12 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   filterPillTextActive: {
-    color: Colors.primary,
-    fontWeight: '700',
+    color: Colors.text,
+    fontWeight: '600',
   },
   resultsRow: {
     paddingHorizontal: 20,
-    marginBottom: 12,
+    marginBottom: 14,
   },
   resultsText: {
     fontSize: 12,
@@ -374,7 +420,7 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingHorizontal: 20,
-    paddingTop: 8,
+    paddingTop: 4,
   },
   empty: {
     paddingVertical: 48,
@@ -393,17 +439,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     backgroundColor: Colors.card,
     borderRadius: 12,
-    marginBottom: 12,
+    marginBottom: 14,
     overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
     elevation: 2,
   },
   cardImageWrap: {
-    width: 100,
-    height: 100,
+    width: 88,
+    height: 88,
+    margin: 14,
+    borderRadius: 44,
+    overflow: 'hidden',
   },
   cardImage: {
     width: '100%',
@@ -423,12 +472,25 @@ const styles = StyleSheet.create({
   },
   cardBody: {
     flex: 1,
-    padding: 12,
+    paddingVertical: 14,
+    paddingRight: 14,
+    paddingLeft: 0,
     justifyContent: 'space-between',
+    minWidth: 0,
+  },
+  matchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginBottom: 4,
+  },
+  matchText: {
+    fontSize: 12,
+    fontWeight: '600',
   },
   cardName: {
     fontSize: 15,
-    fontWeight: '600',
+    fontWeight: '700',
     color: Colors.text,
     marginBottom: 2,
   },
@@ -440,7 +502,8 @@ const styles = StyleSheet.create({
   tagWrap: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    marginBottom: 8,
+    gap: 6,
+    marginBottom: 10,
   },
   tag: {
     backgroundColor: Colors.lightGray,
@@ -451,56 +514,39 @@ const styles = StyleSheet.create({
   tagText: {
     fontSize: 10,
     fontWeight: '600',
-    color: Colors.textSecondary,
+    color: Colors.text,
   },
-  addButton: {
+  cardActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    alignSelf: 'flex-start',
-    backgroundColor: Colors.primary,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
+    gap: 10,
+  },
+  addToRoutineButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.light,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 10,
     gap: 6,
   },
   addButtonDisabled: {
     opacity: 0.7,
   },
-  addButtonIcon: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: Colors.white,
-  },
-  addButtonText: {
+  addToRoutineText: {
     fontSize: 13,
     fontWeight: '600',
-    color: Colors.white,
+    color: Colors.text,
   },
-  shelfButtons: {
-    flexDirection: 'row',
-    gap: 8,
-    marginTop: 8,
-  },
-  shelfButton: {
-    flex: 1,
-    paddingVertical: 8,
-    paddingHorizontal: 10,
-    borderRadius: 8,
-    backgroundColor: Colors.light,
+  bookmarkButton: {
+    width: 44,
+    height: 44,
     alignItems: 'center',
-  },
-  shelfButtonWishlist: {
-    backgroundColor: Colors.mediumLight,
-  },
-  shelfButtonText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: Colors.dark,
-  },
-  shelfButtonTextWishlist: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: Colors.dark,
+    justifyContent: 'center',
+    backgroundColor: Colors.light,
+    borderRadius: 10,
   },
   fab: {
     position: 'absolute',
@@ -517,11 +563,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 6,
-  },
-  fabIcon: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: Colors.white,
   },
   fabText: {
     fontSize: 15,

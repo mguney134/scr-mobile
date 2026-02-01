@@ -69,9 +69,9 @@ export default function RoutineScreen() {
         let stepsToSet = routine.steps ?? [];
         // Eski "step-xxx" id'leri UUID değil; routine_logs.completed_steps uuid[] kabul ediyor.
         // UUID olmayan adımları UUID'ye çevirip rutini güncelliyoruz, böylece tamamlama kaydedilebilir.
-        const hasNonUuid = stepsToSet.some((s) => !isValidUuid(s.id));
+        const hasNonUuid = stepsToSet.some((s: RoutineStep) => !isValidUuid(s.id));
         if (hasNonUuid) {
-          const migrated = stepsToSet.map((s) => ({
+          const migrated = stepsToSet.map((s: RoutineStep) => ({
             ...s,
             id: isValidUuid(s.id) ? s.id : generateUuid(),
           }));
@@ -155,13 +155,16 @@ export default function RoutineScreen() {
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
-        <Text style={styles.headerSubtitle}>Daily Routine</Text>
+        <Text style={styles.title}>Daily Routine</Text>
         <View style={styles.titleRow}>
-          <Text style={styles.title}>Günlük Rutin</Text>
           {totalSteps > 0 && (
             <View style={styles.streakBadge}>
-              <Flame size={14} color={Colors.dark} />
-              <Text style={styles.streakText}>Rutin</Text>
+              <Flame size={14} color={Colors.textSecondary} />
+              <Text style={styles.streakText}>
+                {completedCount === totalSteps && totalSteps > 0
+                  ? `${totalSteps} Adım Tamamlandı!`
+                  : 'Rutin'}
+              </Text>
             </View>
           )}
         </View>
@@ -213,70 +216,70 @@ export default function RoutineScreen() {
           <View style={styles.loadingWrap}>
             <ActivityIndicator size="large" color={Colors.primary} />
           </View>
-        ) : (
-          <View style={styles.listCard}>
-            {steps.length === 0 ? (
-              <View style={styles.empty}>
-                <Sparkles size={40} color={Colors.textSecondary} style={{ marginBottom: 12 }} />
-                <Text style={styles.emptyText}>
-                  Henüz ürün eklemediniz. + ile ekleyin.
-                </Text>
-              </View>
-            ) : (
-              steps
-                .sort((a, b) => a.order - b.order)
-                .map((step, index) => {
-                  const isCompleted = completedStepIds.includes(step.id);
-                  return (
-                    <View key={step.id} style={styles.stepRow}>
-                      <Pressable
-                        style={styles.stepRowContent}
-                        onPress={() => {
-                          if (!routineId) return;
-                          router.push({
-                            pathname: '/routine/add-step',
-                            params: {
-                              routineId,
-                              type: activeTab,
-                              stepId: step.id,
-                              name: step.name,
-                              description: step.description ?? '',
-                            },
-                          });
-                        }}
-                        onLongPress={() => handleDeleteStep(step.id)}
-                      >
-                        <View style={styles.stepImageWrap}>
-                          <View style={styles.stepImagePlaceholder} />
-                          <View style={styles.stepBadge}>
-                            <Text style={styles.stepBadgeText}>{index + 1}</Text>
-                          </View>
-                        </View>
-                        <View style={styles.stepBody}>
-                          <Text style={styles.stepName}>{step.name}</Text>
-                          <Text style={styles.stepDesc} numberOfLines={1}>
-                            {step.description || 'Ürün'} • Adım {index + 1}
-                          </Text>
-                        </View>
-                      </Pressable>
-                      <Pressable
-                        style={styles.stepCheckWrap}
-                        onPress={() => handleToggleComplete(step.id)}
-                        hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-                      >
-                        {isCompleted ? (
-                          <View style={styles.stepCheckDone}>
-                            <Check size={14} color={Colors.white} strokeWidth={3} />
-                          </View>
-                        ) : (
-                          <View style={styles.stepCheckEmpty} />
-                        )}
-                      </Pressable>
-                    </View>
-                  );
-                })
-            )}
+        ) : steps.length === 0 ? (
+          <View style={styles.emptyCard}>
+            <Sparkles size={40} color={Colors.textSecondary} style={{ marginBottom: 12 }} />
+            <Text style={styles.emptyText}>
+              Henüz ürün eklemediniz. + ile ekleyin.
+            </Text>
           </View>
+        ) : (
+          steps
+            .sort((a, b) => a.order - b.order)
+            .map((step, index) => {
+              const isCompleted = completedStepIds.includes(step.id);
+              return (
+                <Pressable
+                  key={step.id}
+                  style={styles.stepCard}
+                  onPress={() => {
+                    if (!routineId) return;
+                    router.push({
+                      pathname: '/routine/add-step',
+                      params: {
+                        routineId,
+                        type: activeTab,
+                        stepId: step.id,
+                        name: step.name,
+                        description: step.description ?? '',
+                      },
+                    });
+                  }}
+                  onLongPress={() => handleDeleteStep(step.id)}
+                >
+                  <View style={styles.stepCardInner}>
+                    <View style={styles.stepImageWrap}>
+                      <View style={styles.stepImagePlaceholder} />
+                      <View style={styles.stepBadge}>
+                        <Text style={styles.stepBadgeText}>{index + 1}</Text>
+                      </View>
+                    </View>
+                    <View style={styles.stepBody}>
+                      <Text style={styles.stepName}>{step.name}</Text>
+                      <Text style={styles.stepDesc} numberOfLines={1}>
+                        {step.description || 'Ürün'} • Adım {index + 1}
+                      </Text>
+                    </View>
+                    <Pressable
+                      style={styles.stepCheckWrap}
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        handleToggleComplete(step.id);
+                      }}
+                      hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                    >
+                      {isCompleted ? (
+                        <View style={styles.stepCheckDone}>
+                          <Check size={14} color={Colors.white} strokeWidth={3} />
+                        </View>
+                      ) : (
+                        <View style={styles.stepCheckEmpty} />
+                      )}
+                    </Pressable>
+                  </View>
+                </Pressable>
+              );
+            })
         )}
       </ScrollView>
 
@@ -309,17 +312,13 @@ const styles = StyleSheet.create({
   header: {
     paddingHorizontal: 20,
     paddingTop: 12,
-    paddingBottom: 16,
-  },
-  headerSubtitle: {
-    fontSize: 13,
-    color: Colors.textSecondary,
-    marginBottom: 4,
+    paddingBottom: 12,
   },
   titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
+    marginTop: 4,
   },
   title: {
     fontSize: 24,
@@ -331,17 +330,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: Colors.light,
     paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingVertical: 6,
     borderRadius: 20,
     gap: 4,
-  },
-  streakIcon: {
-    fontSize: 14,
   },
   streakText: {
     fontSize: 12,
     fontWeight: '600',
-    color: Colors.dark,
+    color: Colors.textSecondary,
   },
   tabs: {
     flexDirection: 'row',
@@ -361,10 +357,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   tabActive: {
-    backgroundColor: Colors.white,
-  },
-  tabIcon: {
-    fontSize: 18,
+    backgroundColor: Colors.light,
   },
   tabLabel: {
     fontSize: 15,
@@ -373,6 +366,7 @@ const styles = StyleSheet.create({
   },
   tabLabelActive: {
     color: Colors.text,
+    fontWeight: '600',
   },
   scroll: {
     flex: 1,
@@ -395,7 +389,7 @@ const styles = StyleSheet.create({
   progressLabel: {
     fontSize: 11,
     fontWeight: '600',
-    color: Colors.success,
+    color: Colors.textSecondary,
     letterSpacing: 0.5,
     marginBottom: 6,
   },
@@ -407,6 +401,7 @@ const styles = StyleSheet.create({
   },
   progressText: {
     fontSize: 14,
+    fontWeight: '600',
     color: Colors.text,
   },
   progressPercent: {
@@ -429,52 +424,49 @@ const styles = StyleSheet.create({
     paddingVertical: 40,
     alignItems: 'center',
   },
-  listCard: {
+  emptyCard: {
     backgroundColor: Colors.card,
     borderRadius: 12,
-    overflow: 'hidden',
+    padding: 32,
+    alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
     shadowRadius: 3,
     elevation: 2,
   },
-  empty: {
-    padding: 32,
-    alignItems: 'center',
-  },
-  emptyIcon: {
-    fontSize: 40,
-    marginBottom: 12,
-  },
   emptyText: {
     fontSize: 15,
     color: Colors.textSecondary,
     textAlign: 'center',
   },
-  stepRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.lightGray,
+  stepCard: {
+    backgroundColor: Colors.card,
+    borderRadius: 12,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
+    overflow: 'hidden',
   },
-  stepRowContent: {
-    flex: 1,
+  stepCardInner: {
     flexDirection: 'row',
     alignItems: 'center',
+    padding: 14,
   },
   stepImageWrap: {
     width: 56,
     height: 56,
-    marginRight: 12,
+    marginRight: 14,
     position: 'relative',
   },
   stepImagePlaceholder: {
     width: '100%',
     height: '100%',
     backgroundColor: Colors.lightGray,
-    borderRadius: 10,
+    borderRadius: 28,
   },
   stepBadge: {
     position: 'absolute',
@@ -494,6 +486,7 @@ const styles = StyleSheet.create({
   },
   stepBody: {
     flex: 1,
+    minWidth: 0,
   },
   stepName: {
     fontSize: 16,
@@ -512,22 +505,17 @@ const styles = StyleSheet.create({
   stepCheckEmpty: {
     width: 24,
     height: 24,
-    borderRadius: 6,
+    borderRadius: 12,
     borderWidth: 2,
     borderColor: Colors.lightGray,
   },
   stepCheckDone: {
     width: 24,
     height: 24,
-    borderRadius: 6,
+    borderRadius: 12,
     backgroundColor: Colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  stepCheckIcon: {
-    color: Colors.white,
-    fontSize: 14,
-    fontWeight: '700',
   },
   fab: {
     position: 'absolute',
