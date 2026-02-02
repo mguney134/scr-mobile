@@ -42,15 +42,25 @@ export async function getLogForDate(
 
 /**
  * Bugünün tamamlanan adımlarını routine_logs'a yazar.
- * completed_steps uuid[] olduğu için sadece UUID formatındaki id'ler kaydedilir.
- * Var olan günün kaydı güncellenir, yoksa yeni satır eklenir.
  */
 export async function upsertTodayLog(
   userId: string,
   routineId: string,
   completedStepIds: string[]
 ) {
-  const date = todayISO();
+  return upsertLogForDate(userId, routineId, todayISO(), completedStepIds);
+}
+
+/**
+ * Belirli bir tarihin tamamlanan adımlarını routine_logs'a yazar (YYYY-MM-DD).
+ * Var olan günün kaydı güncellenir, yoksa yeni satır eklenir.
+ */
+export async function upsertLogForDate(
+  userId: string,
+  routineId: string,
+  date: string,
+  completedStepIds: string[]
+) {
   const uuidsOnly = completedStepIds.filter(isValidUuid);
   const now = new Date().toISOString();
 

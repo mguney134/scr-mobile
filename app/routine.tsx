@@ -18,20 +18,42 @@ import {
   updateRoutineSteps,
   generateUuid,
 } from '../lib/routines';
-import { getTodayLog, upsertTodayLog, isValidUuid } from '../lib/routine-logs';
+import { getLogForDate, upsertLogForDate, isValidUuid } from '../lib/routine-logs';
 import type { RoutineStep, RoutineType } from '../types/routine';
 import { Colors } from '../constants/Colors';
 
-import { Sun, Moon, Flame, Sparkles, Check, Plus } from 'lucide-react-native';
+import { Sun, Moon, Sparkles, Check, Plus, Zap, BarChart3, Bell, LayoutGrid } from 'lucide-react-native';
 
 const ROUTINE_TYPES: { key: RoutineType; label: string; Icon: typeof Sun }[] = [
   { key: 'AM', label: 'Sabah', Icon: Sun },
   { key: 'PM', label: 'Akşam', Icon: Moon },
 ];
 
+const DAY_LABELS = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'];
+
+function todayISO(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+/** Seçilen tarihin bulunduğu haftanın Pazartesi'sinden itibaren 7 gün döner. */
+function getWeekDays(centerDate: string): { date: string; dayNum: number; label: string }[] {
+  const d = new Date(centerDate + 'T12:00:00');
+  const dayOfWeek = d.getDay(); // 0 Pazar, 1 Pazartesi, ...
+  const toMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+  d.setDate(d.getDate() - toMonday);
+  const result: { date: string; dayNum: number; label: string }[] = [];
+  for (let i = 0; i < 7; i++) {
+    const iso = d.toISOString().slice(0, 10);
+    result.push({ date: iso, dayNum: parseInt(iso.slice(8, 10), 10), label: DAY_LABELS[i] });
+    d.setDate(d.getDate() + 1);
+  }
+  return result;
+}
+
 export default function RoutineScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const [selectedDate, setSelectedDate] = useState<string>(() => todayISO());
   const [activeTab, setActiveTab] = useState<RoutineType>('AM');
   const [routineId, setRoutineId] = useState<string | null>(null);
   const [steps, setSteps] = useState<RoutineStep[]>([]);
@@ -39,26 +61,29 @@ export default function RoutineScreen() {
   const [loading, setLoading] = useState(true);
   const [userId, setUserId] = useState<string | null>(null);
 
-  const loadCompletedSteps = useCallback(async (uid: string, rid: string) => {
-    try {
-      const ids = await getTodayLog(uid, rid);
-      setCompletedStepIds(ids);
-    } catch {
-      setCompletedStepIds([]);
-    }
-  }, []);
+  const loadCompletedStepsForDate = useCallback(
+    async (uid: string, rid: string, date: string) => {
+      try {
+        const ids = await getLogForDate(uid, rid, date);
+        setCompletedStepIds(ids);
+      } catch {
+        setCompletedStepIds([]);
+      }
+    },
+    []
+  );
 
   const saveCompletedSteps = useCallback(
     async (uid: string, rid: string, ids: string[]) => {
       setCompletedStepIds(ids);
       try {
-        await upsertTodayLog(uid, rid, ids);
+        await upsertLogForDate(uid, rid, selectedDate, ids);
       } catch (e) {
         console.error(e);
         Alert.alert('Hata', 'Tamamlama kaydedilemedi.');
       }
     },
-    []
+    [selectedDate]
   );
 
   const loadRoutine = useCallback(
@@ -79,7 +104,7 @@ export default function RoutineScreen() {
           stepsToSet = migrated;
         }
         setSteps(stepsToSet);
-        await loadCompletedSteps(uid, routine.id);
+        await loadCompletedStepsForDate(uid, routine.id, selectedDate);
       } catch (e) {
         console.error(e);
         Alert.alert('Hata', 'Rutin yüklenemedi.');
@@ -87,7 +112,7 @@ export default function RoutineScreen() {
         setLoading(false);
       }
     },
-    [loadCompletedSteps]
+    [loadCompletedStepsForDate, selectedDate]
   );
 
   useEffect(() => {
@@ -107,6 +132,16 @@ export default function RoutineScreen() {
         loadRoutine(userId, activeTab);
       }
     }, [userId, routineId, activeTab, loadRoutine])
+  );
+
+  const handleSelectDay = useCallback(
+    (date: string) => {
+      setSelectedDate(date);
+      if (userId && routineId) {
+        loadCompletedStepsForDate(userId, routineId, date);
+      }
+    },
+    [userId, routineId, loadCompletedStepsForDate]
   );
 
   const handleTabChange = (type: RoutineType) => {
@@ -150,23 +185,55 @@ export default function RoutineScreen() {
   const totalSteps = steps.length;
   const progressPercent = totalSteps > 0 ? Math.round((completedCount / totalSteps) * 100) : 0;
 
+  const weekDays = getWeekDays(selectedDate);
+  const isToday = selectedDate === todayISO();
+
   if (!userId && !loading) return null;
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Daily Routine</Text>
-        <View style={styles.titleRow}>
-          {totalSteps > 0 && (
-            <View style={styles.streakBadge}>
-              <Flame size={14} color={Colors.textSecondary} />
-              <Text style={styles.streakText}>
-                {completedCount === totalSteps && totalSteps > 0
-                  ? `${totalSteps} Adım Tamamlandı!`
-                  : 'Rutin'}
-              </Text>
+      <View style={styles.calendarCard}>
+        <View style={styles.calendarTopRow}>
+          <View style={styles.calendarBadge}>
+            <Zap size={14} color={Colors.text} />
+            <Text style={styles.calendarBadgeText}>1</Text>
+            <BarChart3 size={14} color={Colors.text} />
+            <Text style={styles.calendarBadgeText}>0</Text>
+          </View>
+          <Text style={styles.calendarTodayLabel}>{isToday ? 'Bugün' : selectedDate}</Text>
+          <View style={styles.calendarIcons}>
+            <Pressable style={styles.calendarIconBtn} hitSlop={8}>
+              <Bell size={20} color={Colors.white} />
+            </Pressable>
+            <Pressable style={styles.calendarIconBtn} hitSlop={8}>
+              <LayoutGrid size={20} color={Colors.white} />
+            </Pressable>
+          </View>
+        </View>
+        <View style={styles.weekRow}>
+          {weekDays.map((day) => (
+            <View key={day.date} style={styles.weekDayCell}>
+              <Text style={styles.weekDayLabel}>{day.label}</Text>
             </View>
-          )}
+          ))}
+        </View>
+        <View style={styles.datesRow}>
+          {weekDays.map((day) => {
+            const selected = day.date === selectedDate;
+            return (
+              <Pressable
+                key={day.date}
+                style={styles.dateCell}
+                onPress={() => handleSelectDay(day.date)}
+              >
+                <View style={[styles.dateCircle, selected && styles.dateCircleSelected]}>
+                  <Text style={[styles.dateNum, selected && styles.dateNumSelected]}>
+                    {day.dayNum}
+                  </Text>
+                </View>
+              </Pressable>
+            );
+          })}
         </View>
       </View>
 
@@ -309,35 +376,88 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.background,
   },
-  header: {
-    paddingHorizontal: 20,
-    paddingTop: 12,
-    paddingBottom: 12,
+  calendarCard: {
+    marginHorizontal: 20,
+    marginBottom: 16,
+    borderRadius: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    backgroundColor: Colors.medium,
+    overflow: 'hidden',
   },
-  titleRow: {
+  calendarTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    marginTop: 4,
+    justifyContent: 'space-between',
+    marginBottom: 14,
   },
-  title: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: Colors.text,
-  },
-  streakBadge: {
+  calendarBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.light,
+    backgroundColor: 'rgba(255,255,255,0.35)',
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 20,
-    gap: 4,
+    gap: 6,
   },
-  streakText: {
+  calendarBadgeText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: Colors.text,
+  },
+  calendarTodayLabel: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: Colors.white,
+  },
+  calendarIcons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  calendarIconBtn: {
+    padding: 4,
+  },
+  weekRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginBottom: 8,
+  },
+  weekDayCell: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  weekDayLabel: {
     fontSize: 12,
     fontWeight: '600',
-    color: Colors.textSecondary,
+    color: Colors.white,
+  },
+  datesRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+  },
+  dateCell: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 4,
+  },
+  dateCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dateCircleSelected: {
+    backgroundColor: Colors.white,
+  },
+  dateNum: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: Colors.white,
+  },
+  dateNumSelected: {
+    color: Colors.medium,
   },
   tabs: {
     flexDirection: 'row',
