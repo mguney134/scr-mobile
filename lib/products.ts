@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { getOrCreateCompany } from './companies';
 import type { Product, ProductCategory } from '../types/product';
 
 export async function getProducts(options?: {
@@ -10,7 +11,7 @@ export async function getProducts(options?: {
 }) {
   let query = supabase
     .from('products')
-    .select('*')
+    .select('*, companies(name)')
     .order('name', { ascending: true });
 
   if (options?.search?.trim()) {
@@ -35,7 +36,7 @@ export async function getProducts(options?: {
 export async function getProductById(id: string) {
   const { data, error } = await supabase
     .from('products')
-    .select('*')
+    .select('*, companies(name)')
     .eq('id', id)
     .single();
   if (error) throw error;
@@ -57,21 +58,36 @@ export async function createProduct(input: {
   name: string;
   brand?: string;
   category?: ProductCategory;
+  category_id?: string | null;
+  company_id?: string | null;
+  company_name?: string;
   ingredients_text?: string;
   barcode?: string;
   image_url?: string;
+  is_private?: boolean;
+  rating?: number | null;
 }) {
+  let companyId = input.company_id ?? null;
+  if (!companyId && input.company_name?.trim()) {
+    const company = await getOrCreateCompany(input.company_name.trim());
+    companyId = company?.id ?? null;
+  }
+  const row: Record<string, unknown> = {
+    name: input.name.trim(),
+    brand: input.brand?.trim() || null,
+    category: input.category || null,
+    category_id: input.category_id ?? null,
+    company_id: companyId,
+    ingredients_text: input.ingredients_text?.trim() || null,
+    barcode: input.barcode?.trim() || null,
+    image_url: input.image_url?.trim() || null,
+    updated_at: new Date().toISOString(),
+  };
+  if (input.is_private != null) (row as Record<string, boolean>).is_private = input.is_private;
+  if (input.rating != null) (row as Record<string, number | null>).rating = input.rating;
   const { data, error } = await supabase
     .from('products')
-    .insert({
-      name: input.name.trim(),
-      brand: input.brand?.trim() || null,
-      category: input.category || null,
-      ingredients_text: input.ingredients_text?.trim() || null,
-      barcode: input.barcode?.trim() || null,
-      image_url: input.image_url?.trim() || null,
-      updated_at: new Date().toISOString(),
-    })
+    .insert(row)
     .select()
     .single();
   if (error) throw error;

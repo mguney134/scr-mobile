@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, Platform } from 'react-native';
+import { Platform } from 'react-native';
 import { Tabs } from 'expo-router';
 import { Calendar, Package, ShoppingBag, User } from 'lucide-react-native';
 import { Colors } from '../../constants/Colors';
@@ -37,10 +37,8 @@ export default function TabLayout() {
         name="shelf"
         options={{
           title: 'Shelf',
-          tabBarIcon: ({ color, size, focused }) => (
-            <View style={[styles.iconWrap, focused && styles.iconWrapActive]}>
-              <Package color={focused ? Colors.primary : color} size={size || 24} />
-            </View>
+          tabBarIcon: ({ color, size }) => (
+            <Package color={color} size={size || 24} />
           ),
         }}
       />
@@ -65,16 +63,3 @@ export default function TabLayout() {
     </Tabs>
   );
 }
-
-const styles = StyleSheet.create({
-  iconWrap: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  iconWrapActive: {
-    backgroundColor: Colors.light,
-  },
-});

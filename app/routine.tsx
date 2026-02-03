@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  FlatList,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -17,6 +18,7 @@ import {
   getOrCreateRoutine,
   removeStepFromRoutine,
   updateRoutineSteps,
+  reorderRoutineSteps,
   generateUuid,
 } from '../lib/routines';
 import { getLogForDate, upsertLogForDate, isValidUuid } from '../lib/routine-logs';
@@ -24,7 +26,7 @@ import { getProductsByIds } from '../lib/products';
 import type { RoutineStep, RoutineType } from '../types/routine';
 import { Colors } from '../constants/Colors';
 
-import { Sun, Moon, Sparkles, Check, Plus, Zap, BarChart3, Bell, LayoutGrid } from 'lucide-react-native';
+import { Sun, Moon, Sparkles, Check, Plus, Zap, BarChart3, Bell, LayoutGrid, ChevronUp, ChevronDown } from 'lucide-react-native';
 
 const ROUTINE_TYPES: { key: RoutineType; label: string; Icon: typeof Sun }[] = [
   { key: 'AM', label: 'Sabah', Icon: Sun },
@@ -162,6 +164,33 @@ export default function RoutineScreen() {
     [userId, routineId, loadCompletedStepsForDate]
   );
 
+  const handleReorder = useCallback(
+    async (newData: RoutineStep[]) => {
+      if (!routineId || !userId) return;
+      const reordered = newData.map((s, i) => ({ ...s, order: i }));
+      setSteps(reordered);
+      try {
+        await reorderRoutineSteps(routineId, reordered.map((s) => s.id));
+      } catch (e) {
+        console.error(e);
+        Alert.alert('Hata', 'Sıra kaydedilemedi.');
+      }
+    },
+    [routineId, userId]
+  );
+
+  const handleMoveStep = useCallback(
+    (index: number, direction: 'up' | 'down') => {
+      const sorted = [...steps].sort((a, b) => a.order - b.order);
+      const newIndex = direction === 'up' ? index - 1 : index + 1;
+      if (newIndex < 0 || newIndex >= sorted.length) return;
+      const next = [...sorted];
+      [next[index], next[newIndex]] = [next[newIndex], next[index]];
+      handleReorder(next);
+    },
+    [steps, handleReorder]
+  );
+
   const handleTabChange = (type: RoutineType) => {
     if (type === activeTab) return;
     setLoading(true);
@@ -199,7 +228,9 @@ export default function RoutineScreen() {
     saveCompletedSteps(userId, routineId, next);
   };
 
-  const completedCount = completedStepIds.length;
+  const stepIds = new Set(steps.map((s) => s.id));
+  const validCompletedIds = completedStepIds.filter((id) => stepIds.has(id));
+  const completedCount = validCompletedIds.length;
   const totalSteps = steps.length;
   const progressPercent = totalSteps > 0 ? Math.round((completedCount / totalSteps) * 100) : 0;
 
@@ -223,9 +254,7 @@ export default function RoutineScreen() {
             <Pressable style={styles.calendarIconBtn} hitSlop={8}>
               <Bell size={20} color={Colors.white} />
             </Pressable>
-            <Pressable style={styles.calendarIconBtn} hitSlop={8}>
-              <LayoutGrid size={20} color={Colors.white} />
-            </Pressable>
+          
           </View>
         </View>
         <View style={styles.weekRow}>
@@ -275,106 +304,127 @@ export default function RoutineScreen() {
         ))}
       </View>
 
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {totalSteps > 0 && (
-          <View style={styles.progressCard}>
-            <Text style={styles.progressLabel}>İLERLEME</Text>
-            <View style={styles.progressRow}>
-              <Text style={styles.progressText}>
-                {completedCount} / {totalSteps} adım tamamlandı
-              </Text>
-              <Text style={styles.progressPercent}>{progressPercent}%</Text>
+      {loading ? (
+        <View style={styles.loadingWrap}>
+          <ActivityIndicator size="large" color={Colors.primary} />
+        </View>
+      ) : steps.length === 0 ? (
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {totalSteps > 0 && (
+            <View style={styles.progressCard}>
+              <Text style={styles.progressLabel}>İLERLEME</Text>
+              <View style={styles.progressRow}>
+                <Text style={styles.progressText}>
+                  {completedCount} / {totalSteps} adım tamamlandı
+                </Text>
+                <Text style={styles.progressPercent}>{progressPercent}%</Text>
+              </View>
+              <View style={styles.progressBarBg}>
+                <View
+                  style={[styles.progressBarFill, { width: `${progressPercent}%` }]}
+                />
+              </View>
             </View>
-            <View style={styles.progressBarBg}>
-              <View
-                style={[styles.progressBarFill, { width: `${progressPercent}%` }]}
-              />
-            </View>
-          </View>
-        )}
-
-        {loading ? (
-          <View style={styles.loadingWrap}>
-            <ActivityIndicator size="large" color={Colors.primary} />
-          </View>
-        ) : steps.length === 0 ? (
+          )}
           <View style={styles.emptyCard}>
             <Sparkles size={40} color={Colors.textSecondary} style={{ marginBottom: 12 }} />
             <Text style={styles.emptyText}>
               Henüz ürün eklemediniz. + ile ekleyin.
             </Text>
           </View>
-        ) : (
-          steps
-            .sort((a, b) => a.order - b.order)
-            .map((step, index) => {
-              const isCompleted = completedStepIds.includes(step.id);
-              return (
-                <Pressable
-                  key={step.id}
-                  style={styles.stepCard}
-                  onPress={() => {
-                    if (!routineId) return;
-                    router.push({
-                      pathname: '/routine/add-step',
-                      params: {
-                        routineId,
-                        type: activeTab,
-                        stepId: step.id,
-                        name: step.name,
-                        description: step.description ?? '',
-                      },
-                    });
-                  }}
-                  onLongPress={() => handleDeleteStep(step.id)}
-                >
-                  <View style={styles.stepCardInner}>
-                    <View style={styles.stepImageWrap}>
-                      {step.product_id && stepImageUrls[step.product_id] ? (
-                        <Image
-                          source={{ uri: stepImageUrls[step.product_id] }}
-                          style={styles.stepImage}
-                          resizeMode="cover"
-                        />
-                      ) : (
-                        <View style={styles.stepImagePlaceholder} />
-                      )}
-                      <View style={styles.stepBadge}>
-                        <Text style={styles.stepBadgeText}>{index + 1}</Text>
-                      </View>
-                    </View>
-                    <View style={styles.stepBody}>
-                      <Text style={styles.stepName}>{step.name}</Text>
-                      <Text style={styles.stepDesc} numberOfLines={1}>
-                        {step.description || 'Ürün'} • Adım {index + 1}
-                      </Text>
-                    </View>
+        </ScrollView>
+      ) : (
+        <FlatList
+          data={[...steps].sort((a, b) => a.order - b.order)}
+          keyExtractor={(item) => item.id}
+          style={styles.scroll}
+          contentContainerStyle={styles.scrollContent}
+          ListHeaderComponent={
+            totalSteps > 0 ? (
+              <View style={styles.progressCard}>
+                <Text style={styles.progressLabel}>İLERLEME</Text>
+                <View style={styles.progressRow}>
+                  <Text style={styles.progressText}>
+                    {completedCount} / {totalSteps} adım tamamlandı
+                  </Text>
+                  <Text style={styles.progressPercent}>{progressPercent}%</Text>
+                </View>
+                <View style={styles.progressBarBg}>
+                  <View
+                    style={[styles.progressBarFill, { width: `${progressPercent}%` }]}
+                  />
+                </View>
+              </View>
+            ) : null
+          }
+          renderItem={({ item: step, index }) => {
+            const isCompleted = completedStepIds.includes(step.id);
+            const sortedLength = steps.length;
+            return (
+              <Pressable
+                style={styles.stepCard}
+                onLongPress={() => handleDeleteStep(step.id)}
+              >
+                <View style={styles.stepCardInner}>
+                  <View style={styles.stepReorderCol}>
                     <Pressable
-                      style={styles.stepCheckWrap}
-                      onPress={(e) => {
-                        e.stopPropagation();
-                        handleToggleComplete(step.id);
-                      }}
-                      hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                      style={[styles.stepReorderBtn, index === 0 && styles.stepReorderBtnDisabled]}
+                      onPress={() => handleMoveStep(index, 'up')}
+                      disabled={index === 0}
                     >
-                      {isCompleted ? (
-                        <View style={styles.stepCheckDone}>
-                          <Check size={14} color={Colors.white} strokeWidth={3} />
-                        </View>
-                      ) : (
-                        <View style={styles.stepCheckEmpty} />
-                      )}
+                      <ChevronUp size={18} color={index === 0 ? Colors.lightGray : Colors.textSecondary} />
+                    </Pressable>
+                    <Pressable
+                      style={[styles.stepReorderBtn, index >= sortedLength - 1 && styles.stepReorderBtnDisabled]}
+                      onPress={() => handleMoveStep(index, 'down')}
+                      disabled={index >= sortedLength - 1}
+                    >
+                      <ChevronDown size={18} color={index >= sortedLength - 1 ? Colors.lightGray : Colors.textSecondary} />
                     </Pressable>
                   </View>
-                </Pressable>
-              );
-            })
-        )}
-      </ScrollView>
+                  <View style={styles.stepImageWrap}>
+                    {step.product_id && stepImageUrls[step.product_id] ? (
+                      <Image
+                        source={{ uri: stepImageUrls[step.product_id] }}
+                        style={styles.stepImage}
+                        resizeMode="cover"
+                      />
+                    ) : (
+                      <View style={styles.stepImagePlaceholder} />
+                    )}
+                    <View style={styles.stepBadge}>
+                      <Text style={styles.stepBadgeText}>{index + 1}</Text>
+                    </View>
+                  </View>
+                  <View style={styles.stepBody}>
+                    <Text style={styles.stepName}>{step.name}</Text>
+                    <Text style={styles.stepDesc} numberOfLines={1}>
+                      {step.description || 'Ürün'} • Adım {index + 1}
+                    </Text>
+                  </View>
+                  <Pressable
+                    style={styles.stepCheckWrap}
+                    onPress={() => handleToggleComplete(step.id)}
+                    hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                  >
+                    {isCompleted ? (
+                      <View style={styles.stepCheckDone}>
+                        <Check size={14} color={Colors.white} strokeWidth={3} />
+                      </View>
+                    ) : (
+                      <View style={styles.stepCheckEmpty} />
+                    )}
+                  </Pressable>
+                </View>
+              </Pressable>
+            );
+          }}
+        />
+      )}
 
       <Pressable
         style={[
@@ -385,8 +435,8 @@ export default function RoutineScreen() {
         onPress={() => {
           if (!routineId) return;
           router.push({
-            pathname: '/routine/add-step',
-            params: { routineId, type: activeTab },
+            pathname: '/products/add',
+            params: { routineId, routineType: activeTab },
           });
         }}
         disabled={!routineId}
@@ -596,6 +646,18 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
     elevation: 2,
     overflow: 'hidden',
+  },
+  stepReorderCol: {
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 8,
+  },
+  stepReorderBtn: {
+    padding: 4,
+  },
+  stepReorderBtnDisabled: {
+    opacity: 0.4,
   },
   stepCardInner: {
     flexDirection: 'row',

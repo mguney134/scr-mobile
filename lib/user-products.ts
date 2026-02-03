@@ -7,7 +7,7 @@ export async function getUserProducts(
 ) {
   let query = supabase
     .from('user_products')
-    .select('*, products(*)')
+    .select('*, products(*, companies(name))')
     .eq('user_id', userId)
     .order('updated_at', { ascending: false });
 
@@ -37,7 +37,7 @@ export async function addToShelf(
       expiration_date: options?.expiration_date ?? null,
       updated_at: new Date().toISOString(),
     })
-    .select('*, products(*)')
+    .select('*, products(*, companies(name))')
     .single();
 
   if (error) throw error;
@@ -58,7 +58,7 @@ export async function updateUserProduct(
     .from('user_products')
     .update({ ...updates, updated_at: new Date().toISOString() })
     .eq('id', id)
-    .select('*, products(*)')
+    .select('*, products(*, companies(name))')
     .single();
 
   if (error) throw error;

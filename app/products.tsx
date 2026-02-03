@@ -29,7 +29,7 @@ import { addToShelf, getExistingUserProduct, updateUserProduct } from '../lib/us
 import type { Product } from '../types/product';
 import type { RoutineType } from '../types/routine';
 import type { UserProductStatus } from '../types/user-product';
-import { PRODUCT_CATEGORY_LABELS, type ProductCategory } from '../types/product';
+import { PRODUCT_CATEGORY_LABELS, getProductBrandDisplay, type ProductCategory } from '../types/product';
 import { Colors } from '../constants/Colors';
 
 const CATEGORIES: { key: ProductCategory | ''; label: string }[] = [
@@ -112,10 +112,11 @@ export default function ProductsScreen() {
         return;
       }
       const routine = await getOrCreateRoutine(user.id, type, user.email ?? undefined);
+      const brandDisplay = getProductBrandDisplay(product);
       await addStepToRoutine(routine.id, {
         name: product.name,
-        description: product.brand
-          ? `${product.brand}${product.category ? ` • ${PRODUCT_CATEGORY_LABELS[product.category as ProductCategory]}` : ''}`
+        description: brandDisplay
+          ? `${brandDisplay}${product.category ? ` • ${PRODUCT_CATEGORY_LABELS[product.category as ProductCategory]}` : ''}`
           : product.category
             ? PRODUCT_CATEGORY_LABELS[product.category as ProductCategory]
             : undefined,
@@ -191,9 +192,9 @@ export default function ProductsScreen() {
           <Text style={styles.cardName} numberOfLines={2}>
             {item.name}
           </Text>
-          {item.brand ? (
+          {getProductBrandDisplay(item) ? (
             <Text style={styles.cardBrand} numberOfLines={1}>
-              {item.brand}
+              {getProductBrandDisplay(item)}
             </Text>
           ) : null}
           {categoryLabel ? (

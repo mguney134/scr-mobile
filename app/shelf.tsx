@@ -17,6 +17,7 @@ import { supabase } from '../lib/supabase';
 import { getUserProducts, removeFromShelf, updateUserProduct } from '../lib/user-products';
 import { getShelfBadge } from '../lib/shelf-badge';
 import type { UserProductWithProduct, UserProductStatus } from '../types/user-product';
+import { getProductBrandDisplay } from '../types/product';
 import { Colors } from '../constants/Colors';
 
 const TABS: { key: UserProductStatus; label: string }[] = [
@@ -99,6 +100,7 @@ export default function ShelfScreen() {
   const renderCard = ({ item }: { item: UserProductWithProduct }) => {
     const product = item.products;
     if (!product) return null;
+    const brand = getProductBrandDisplay(product);
 
     const badge = getShelfBadge(
       item.expiration_date,
@@ -143,9 +145,9 @@ export default function ShelfScreen() {
           </View>
         </View>
         <View style={styles.cardBody}>
-          {product.brand ? (
+          {brand ? (
             <Text style={styles.cardBrand} numberOfLines={1}>
-              {product.brand.toUpperCase()}
+              {brand.toUpperCase()}
             </Text>
           ) : null}
           <Text style={styles.cardName} numberOfLines={2}>

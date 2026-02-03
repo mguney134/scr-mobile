@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   StyleSheet,
   Text,
@@ -10,32 +10,45 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Switch,
+  Modal,
+  FlatList,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { createProduct } from '../../lib/products';
-import { PRODUCT_CATEGORY_LABELS, type ProductCategory } from '../../types/product';
+import { getCategories } from '../../lib/categories';
+import { addStepToRoutine } from '../../lib/routines';
+import type { Category } from '../../types/category';
 import { Colors } from '../../constants/Colors';
+import { ChevronDown, Lock, Star } from 'lucide-react-native';
 
-const CATEGORIES: ProductCategory[] = [
-  'cleanser',
-  'toner',
-  'serum',
-  'moisturizer',
-  'sunscreen',
-  'mask',
-  'treatment',
-  'eye_cream',
-  'other',
-];
+type ProductType = 'commercial' | 'other';
 
 export default function AddProductScreen() {
   const router = useRouter();
+  const { routineId, routineType } = useLocalSearchParams<{ routineId?: string; routineType?: string }>();
+  const [productType, setProductType] = useState<ProductType>('commercial');
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [categoryId, setCategoryId] = useState<string | null>(null);
+  const [companyName, setCompanyName] = useState('');
   const [name, setName] = useState('');
-  const [brand, setBrand] = useState('');
-  const [category, setCategory] = useState<ProductCategory | ''>('');
+  const [isPrivate, setIsPrivate] = useState(false);
+  const [rating, setRating] = useState<number>(0);
+  const [showCategoryPicker, setShowCategoryPicker] = useState(false);
+  const [additionalExpanded, setAdditionalExpanded] = useState(false);
   const [ingredients, setIngredients] = useState('');
   const [imageUrl, setImageUrl] = useState('');
   const [loading, setLoading] = useState(false);
+  const [loadingCategories, setLoadingCategories] = useState(true);
+
+  useEffect(() => {
+    getCategories()
+      .then(setCategories)
+      .catch(() => setCategories([]))
+      .finally(() => setLoadingCategories(false));
+  }, []);
+
+  const selectedCategory = categories.find((c) => c.id === categoryId);
 
   const handleSave = async () => {
     const trimmedName = name.trim();
@@ -45,16 +58,31 @@ export default function AddProductScreen() {
     }
     setLoading(true);
     try {
-      await createProduct({
+      const product = await createProduct({
         name: trimmedName,
-        brand: brand.trim() || undefined,
-        category: category || undefined,
+        company_name: companyName.trim() || undefined,
+        category_id: categoryId ?? undefined,
         ingredients_text: ingredients.trim() || undefined,
         image_url: imageUrl.trim() || undefined,
+        is_private: isPrivate,
+        rating: rating > 0 ? rating : undefined,
       });
-      Alert.alert('Kaydedildi', 'Ürün eklendi.', [
-        { text: 'Tamam', onPress: () => router.back() },
-      ]);
+
+      // Eğer rutin sayfasından açıldıysa, ürünü rutine ekle
+      if (routineId && product) {
+        await addStepToRoutine(routineId, {
+          name: trimmedName,
+          description: selectedCategory?.name || 'Ürün',
+          product_id: product.id,
+        });
+        Alert.alert('Kaydedildi', 'Ürün eklendi ve rutine dahil edildi.', [
+          { text: 'Tamam', onPress: () => router.back() },
+        ]);
+      } else {
+        Alert.alert('Kaydedildi', 'Ürün eklendi.', [
+          { text: 'Tamam', onPress: () => router.back() },
+        ]);
+      }
     } catch (e) {
       console.error(e);
       Alert.alert('Hata', 'Ürün eklenemedi.');
@@ -68,88 +96,199 @@ export default function AddProductScreen() {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
+      <View style={styles.header}>
+        <Pressable style={styles.headerBtn} onPress={() => router.back()} disabled={loading}>
+          <Text style={styles.headerCancel}>İptal</Text>
+        </Pressable>
+        <Text style={styles.headerTitle}>Ürün / Aksiyon Ekle</Text>
+        <Pressable
+          style={styles.headerBtn}
+          onPress={handleSave}
+          disabled={loading}
+        >
+          {loading ? (
+            <ActivityIndicator size="small" color={Colors.primary} />
+          ) : (
+            <Text style={styles.headerSubmit}>Gönder</Text>
+          )}
+        </Pressable>
+      </View>
+
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
       >
-        <View style={styles.form}>
-          <Text style={styles.label}>Ürün adı *</Text>
+        <Text style={styles.sectionLabel}>Ürün / Aksiyon Tipi</Text>
+        <View style={styles.typeRow}>
+          <Pressable
+            style={[styles.typeCard, productType === 'commercial' && styles.typeCardSelected]}
+            onPress={() => setProductType('commercial')}
+            disabled={loading}
+          >
+            <View style={[styles.radio, productType === 'commercial' && styles.radioSelected]} />
+            <Text style={[styles.typeTitle, productType === 'commercial' && styles.typeTitleSelected]}>
+              TİCARİ ÜRÜN
+            </Text>
+            <Text style={[styles.typeDesc, productType === 'commercial' && styles.typeDescSelected]}>
+              Cilt, saç, tırnak veya vücut bakımı, takviye
+            </Text>
+          </Pressable>
+          <Pressable
+            style={[styles.typeCard, productType === 'other' && styles.typeCardSelected]}
+            onPress={() => setProductType('other')}
+            disabled={loading}
+          >
+            <View style={[styles.radio, productType === 'other' && styles.radioSelected]} />
+            <Text style={[styles.typeTitle, productType === 'other' && styles.typeTitleSelected]}>
+              DİĞER
+            </Text>
+            <Text style={[styles.typeDesc, productType === 'other' && styles.typeDescSelected]}>
+              Aktivite, DIY, fitness, hobi, öğrenme, ev işi
+            </Text>
+          </Pressable>
+        </View>
+
+        <View style={styles.formCard}>
+          <Text style={styles.fieldLabel}>Kategori:</Text>
+          <Pressable
+            style={styles.dropdown}
+            onPress={() => setShowCategoryPicker(true)}
+            disabled={loading}
+          >
+            <Text style={[styles.dropdownText, !selectedCategory && styles.dropdownPlaceholder]}>
+              {selectedCategory?.name ?? 'Yok'}
+            </Text>
+            <ChevronDown size={18} color={Colors.textSecondary} />
+          </Pressable>
+
+          <Text style={styles.fieldLabel}>Marka / Şirket:</Text>
           <TextInput
             style={styles.input}
-            placeholder="Örn: Hyaluronic Water Gel"
+            placeholder="Marka adı..."
+            placeholderTextColor={Colors.textSecondary}
+            value={companyName}
+            onChangeText={setCompanyName}
+            editable={!loading}
+          />
+
+          <Text style={styles.fieldLabel}>Ad:</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Ürün adı..."
             placeholderTextColor={Colors.textSecondary}
             value={name}
             onChangeText={setName}
             editable={!loading}
           />
-          <Text style={styles.label}>Marka</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Örn: Neutrogena"
-            placeholderTextColor={Colors.textSecondary}
-            value={brand}
-            onChangeText={setBrand}
-            editable={!loading}
-          />
-          <Text style={styles.label}>Kategori</Text>
-          <View style={styles.categoryWrap}>
-            {CATEGORIES.map((cat) => (
-              <Pressable
-                key={cat}
-                style={[
-                  styles.categoryPill,
-                  category === cat && styles.categoryPillActive,
-                ]}
-                onPress={() => setCategory(category === cat ? '' : cat)}
-                disabled={loading}
-              >
-                <Text
-                  style={[
-                    styles.categoryPillText,
-                    category === cat && styles.categoryPillTextActive,
-                  ]}
-                >
-                  {PRODUCT_CATEGORY_LABELS[cat]}
-                </Text>
-              </Pressable>
-            ))}
+
+          <View style={styles.privacyRow}>
+            <Lock size={18} color={Colors.textSecondary} />
+            <Text style={styles.privacyText}>Gizli yap (sadece siz arayıp takip edebilirsiniz)</Text>
+            <Switch
+              value={isPrivate}
+              onValueChange={setIsPrivate}
+              trackColor={{ false: Colors.lightGray, true: Colors.light }}
+              thumbColor={Colors.white}
+            />
           </View>
-          <Text style={styles.label}>İçerik / Notlar (isteğe bağlı)</Text>
-          <TextInput
-            style={[styles.input, styles.inputMultiline]}
-            placeholder="İçerik listesi veya notlar"
-            placeholderTextColor={Colors.textSecondary}
-            value={ingredients}
-            onChangeText={setIngredients}
-            editable={!loading}
-            multiline
-            numberOfLines={3}
-          />
-          <Text style={styles.label}>Görsel URL (isteğe bağlı)</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="https://..."
-            placeholderTextColor={Colors.textSecondary}
-            value={imageUrl}
-            onChangeText={setImageUrl}
-            editable={!loading}
-            keyboardType="url"
-            autoCapitalize="none"
-          />
-          <Pressable
-            style={[styles.button, loading && styles.buttonDisabled]}
-            onPress={handleSave}
-            disabled={loading}
-          >
-            {loading ? (
-              <ActivityIndicator color={Colors.buttonText} />
-            ) : (
-              <Text style={styles.buttonText}>Ürün Ekle</Text>
-            )}
-          </Pressable>
         </View>
+
+        <Text style={styles.ratingQuestion}>
+          Bu ürünü zaten denediniz mi? Evetse nasıl puanlarsınız?
+        </Text>
+        <View style={styles.starsRow}>
+          {[1, 2, 3, 4, 5].map((n) => (
+            <Pressable
+              key={n}
+              style={styles.starBtn}
+              onPress={() => setRating(n)}
+              disabled={loading}
+            >
+              <Star
+                size={28}
+                color={n <= rating ? Colors.primary : Colors.lightGray}
+                fill={n <= rating ? Colors.primary : 'transparent'}
+              />
+            </Pressable>
+          ))}
+        </View>
+
+        <Pressable
+          style={styles.additionalHeader}
+          onPress={() => setAdditionalExpanded(!additionalExpanded)}
+        >
+          <View>
+            <Text style={styles.additionalTitle}>EK BİLGİ</Text>
+            <Text style={styles.additionalSub}>Zorunlu değil. İstediğinizi ekleyin :)</Text>
+          </View>
+          <ChevronDown
+            size={20}
+            color={Colors.textSecondary}
+            style={{ transform: [{ rotate: additionalExpanded ? '180deg' : '0deg' }] }}
+          />
+        </Pressable>
+        {additionalExpanded && (
+          <View style={styles.additionalCard}>
+            {!selectedCategory && (
+              <Text style={styles.additionalHint}>* Önce kategori seçin</Text>
+            )}
+            <Text style={styles.fieldLabel}>İçerik / Notlar</Text>
+            <TextInput
+              style={[styles.input, styles.inputMultiline]}
+              placeholder="İçerik listesi veya notlar"
+              placeholderTextColor={Colors.textSecondary}
+              value={ingredients}
+              onChangeText={setIngredients}
+              editable={!loading}
+              multiline
+              numberOfLines={3}
+            />
+            <Text style={styles.fieldLabel}>Görsel URL</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="https://..."
+              placeholderTextColor={Colors.textSecondary}
+              value={imageUrl}
+              onChangeText={setImageUrl}
+              editable={!loading}
+              keyboardType="url"
+              autoCapitalize="none"
+            />
+          </View>
+        )}
       </ScrollView>
+
+      <Modal
+        visible={showCategoryPicker}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowCategoryPicker(false)}
+      >
+        <Pressable style={styles.modalOverlay} onPress={() => setShowCategoryPicker(false)}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Kategori Seçin</Text>
+            <FlatList
+              data={[{ id: '', name: 'Yok' }, ...categories]}
+              keyExtractor={(item) => item.id || 'none'}
+              renderItem={({ item }) => (
+                <Pressable
+                  style={styles.modalItem}
+                  onPress={() => {
+                    setCategoryId(item.id || null);
+                    setShowCategoryPicker(false);
+                  }}
+                >
+                  <Text style={styles.modalItemText}>{item.name}</Text>
+                </Pressable>
+              )}
+            />
+            <Pressable style={styles.modalClose} onPress={() => setShowCategoryPicker(false)}>
+              <Text style={styles.modalCloseText}>Kapat</Text>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -159,6 +298,34 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.background,
   },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: Colors.border,
+    backgroundColor: Colors.card,
+  },
+  headerBtn: {
+    minWidth: 64,
+    alignItems: 'flex-start',
+  },
+  headerCancel: {
+    fontSize: 16,
+    color: Colors.textSecondary,
+  },
+  headerTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: Colors.text,
+  },
+  headerSubmit: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: Colors.primary,
+  },
   scroll: {
     flex: 1,
   },
@@ -166,27 +333,93 @@ const styles = StyleSheet.create({
     padding: 20,
     paddingBottom: 40,
   },
-  form: {
-    backgroundColor: Colors.card,
-    borderRadius: 12,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
-    elevation: 2,
+  sectionLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: Colors.textSecondary,
+    marginBottom: 10,
+    letterSpacing: 0.5,
   },
-  label: {
+  typeRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 24,
+  },
+  typeCard: {
+    flex: 1,
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: Colors.border,
+    backgroundColor: Colors.card,
+  },
+  typeCardSelected: {
+    borderColor: Colors.primary,
+    backgroundColor: Colors.light,
+  },
+  radio: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: Colors.lightGray,
+    marginBottom: 8,
+  },
+  radioSelected: {
+    borderColor: Colors.primary,
+    backgroundColor: Colors.primary,
+  },
+  typeTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: Colors.textSecondary,
+    letterSpacing: 0.5,
+    marginBottom: 4,
+  },
+  typeTitleSelected: {
+    color: Colors.primary,
+  },
+  typeDesc: {
+    fontSize: 11,
+    color: Colors.textSecondary,
+  },
+  typeDescSelected: {
+    color: Colors.text,
+  },
+  formCard: {
+    backgroundColor: Colors.lightGray,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 24,
+  },
+  fieldLabel: {
     fontSize: 14,
     fontWeight: '600',
     color: Colors.text,
     marginBottom: 8,
     marginTop: 12,
   },
-  input: {
-    backgroundColor: Colors.inputBackground,
+  dropdown: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: Colors.card,
     borderWidth: 1,
-    borderColor: Colors.inputBorder,
+    borderColor: Colors.border,
+    borderRadius: 10,
+    padding: 14,
+  },
+  dropdownText: {
+    fontSize: 16,
+    color: Colors.text,
+  },
+  dropdownPlaceholder: {
+    color: Colors.textSecondary,
+  },
+  input: {
+    backgroundColor: Colors.card,
+    borderWidth: 1,
+    borderColor: Colors.border,
     borderRadius: 10,
     padding: 14,
     fontSize: 16,
@@ -196,41 +429,95 @@ const styles = StyleSheet.create({
     minHeight: 80,
     textAlignVertical: 'top',
   },
-  categoryWrap: {
+  privacyRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  categoryPill: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: Colors.lightGray,
-  },
-  categoryPillActive: {
-    backgroundColor: Colors.light,
-  },
-  categoryPillText: {
-    fontSize: 13,
-    color: Colors.textSecondary,
-    fontWeight: '500',
-  },
-  categoryPillTextActive: {
-    color: Colors.primary,
-  },
-  button: {
-    backgroundColor: Colors.primary,
-    paddingVertical: 14,
-    borderRadius: 10,
     alignItems: 'center',
-    marginTop: 24,
+    gap: 10,
+    marginTop: 16,
+    paddingVertical: 8,
   },
-  buttonDisabled: {
-    opacity: 0.7,
+  privacyText: {
+    flex: 1,
+    fontSize: 14,
+    color: Colors.text,
   },
-  buttonText: {
+  ratingQuestion: {
+    fontSize: 15,
+    color: Colors.text,
+    marginBottom: 12,
+  },
+  starsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 24,
+  },
+  starBtn: {
+    padding: 4,
+  },
+  additionalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  additionalTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: Colors.textSecondary,
+    letterSpacing: 0.5,
+  },
+  additionalSub: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+    marginTop: 2,
+  },
+  additionalCard: {
+    backgroundColor: Colors.lightGray,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 24,
+  },
+  additionalHint: {
+    fontSize: 12,
+    color: Colors.error,
+    marginBottom: 8,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: Colors.card,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    maxHeight: '70%',
+    paddingBottom: 24,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: Colors.text,
+    padding: 16,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: Colors.border,
+  },
+  modalItem: {
+    padding: 16,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: Colors.border,
+  },
+  modalItemText: {
+    fontSize: 16,
+    color: Colors.text,
+  },
+  modalClose: {
+    padding: 16,
+    alignItems: 'center',
+  },
+  modalCloseText: {
     fontSize: 16,
     fontWeight: '600',
-    color: Colors.buttonText,
+    color: Colors.primary,
   },
 });
