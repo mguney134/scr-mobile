@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import {
   StyleSheet,
   Text,
@@ -8,15 +8,39 @@ import {
   ScrollView,
   Modal,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Settings, Pencil, LogOut, TrendingUp, ChevronRight } from 'lucide-react-native';
 import { supabase } from '../../lib/supabase';
 import { getRoutineLogDaysCount } from '../../lib/routine-logs';
 import { getUserProducts } from '../../lib/user-products';
+import { getCurrentUserSkinProfile, type UserSkinProfile } from '../../lib/users';
 import { Colors } from '../../constants/Colors';
 import { useLanguage } from '../../context/LanguageContext';
 import { LOCALE_OPTIONS, type Locale } from '../../constants/translations';
+import { getTranslation } from '../../constants/translations';
+import type { TranslationKey } from '../../constants/translations';
+
+const SKIN_CONCERN_KEYS = [
+  'onboardingConcernAcne',
+  'onboardingConcernLines',
+  'onboardingConcernSensitivity',
+  'onboardingConcernRedness',
+  'onboardingConcernDryness',
+  'onboardingConcernOily',
+  'onboardingConcernPigmentation',
+  'onboardingConcernGeneral',
+] as const;
+
+function formatSkinConcernsDisplay(enLabels: string[] | undefined, t: (k: TranslationKey) => string): string {
+  if (!enLabels?.length) return '—';
+  return enLabels
+    .map((en) => {
+      const key = SKIN_CONCERN_KEYS.find((k) => getTranslation('en', k as TranslationKey) === en);
+      return key ? t(key) : en;
+    })
+    .join(', ');
+}
 
 type UserProfile = {
   email: string | null;
@@ -24,14 +48,19 @@ type UserProfile = {
   createdAt: string | null;
   routineStreakDays: number;
   productsCount: number;
+  skinProfile: UserSkinProfile | null;
 };
 
-const SKIN_PROFILE_ROWS: { key: string; labelKey: 'primaryConcerns' | 'sensitivity' | 'climate' | 'allergies'; valueKey: 'acneSpot' | 'sensitive' | 'humidTropical' | 'parabensFragrance' }[] = [
-  { key: 'concerns', labelKey: 'primaryConcerns', valueKey: 'acneSpot' },
-  { key: 'sensitivity', labelKey: 'sensitivity', valueKey: 'sensitive' },
-  { key: 'climate', labelKey: 'climate', valueKey: 'humidTropical' },
-  { key: 'allergies', labelKey: 'allergies', valueKey: 'parabensFragrance' },
-];
+type SkinRow = { key: string; labelKey: 'primaryConcerns' | 'sensitivity' | 'climate' | 'allergies'; getValue: (profile: UserProfile, t: (k: TranslationKey) => string) => string };
+
+function getSkinProfileRows(): SkinRow[] {
+  return [
+    { key: 'concerns', labelKey: 'primaryConcerns', getValue: (p, t) => formatSkinConcernsDisplay(p.skinProfile?.skin_concerns, t) },
+    { key: 'sensitivity', labelKey: 'sensitivity', getValue: () => '—' },
+    { key: 'climate', labelKey: 'climate', getValue: () => '—' },
+    { key: 'allergies', labelKey: 'allergies', getValue: () => '—' },
+  ];
+}
 
 function formatMemberSince(createdAt: string | null, memberSinceText: string): string {
   if (!createdAt) return '—';
@@ -56,9 +85,10 @@ export default function ProfileScreen() {
       return;
     }
     try {
-      const [streakDays, products] = await Promise.all([
+      const [streakDays, products, skinProfile] = await Promise.all([
         getRoutineLogDaysCount(user.id),
         getUserProducts(user.id),
+        getCurrentUserSkinProfile(user.id),
       ]);
       const displayName = user.user_metadata?.full_name
         ?? user.email?.split('@')[0]?.replace(/[._]/g, ' ')?.replace(/\b\w/g, (c) => c.toUpperCase())
@@ -69,6 +99,7 @@ export default function ProfileScreen() {
         createdAt: user.created_at ?? null,
         routineStreakDays: streakDays,
         productsCount: products.length,
+        skinProfile,
       });
     } catch (e) {
       console.error(e);
@@ -78,15 +109,18 @@ export default function ProfileScreen() {
         createdAt: user.created_at ?? null,
         routineStreakDays: 0,
         productsCount: 0,
+        skinProfile: null,
       });
     } finally {
       setLoading(false);
     }
   }, [router]);
 
-  useEffect(() => {
-    loadProfile();
-  }, [loadProfile]);
+  useFocusEffect(
+    useCallback(() => {
+      loadProfile();
+    }, [loadProfile])
+  );
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
@@ -125,7 +159,9 @@ export default function ProfileScreen() {
             </Text>
           </View>
           <Text style={styles.displayName}>{profile.displayName}</Text>
-          <Text style={styles.skinType}>{t('addSkinType')}</Text>
+          <Text style={styles.skinType}>
+            {profile.skinProfile?.skin_type?.trim() ? profile.skinProfile.skin_type : t('addSkinType')}
+          </Text>
           <Text style={styles.memberSince}>{formatMemberSince(profile.createdAt, t('memberSince'))}</Text>
         </View>
 
@@ -156,22 +192,25 @@ export default function ProfileScreen() {
         <View style={styles.skinSection}>
           <Text style={styles.sectionTitle}>{t('skinProfile')}</Text>
           <View style={styles.skinCard}>
-            {SKIN_PROFILE_ROWS.map((row, index) => (
-              <View
-                key={row.key}
-                style={[
-                  styles.skinRow,
-                  index === SKIN_PROFILE_ROWS.length - 1 && styles.skinRowLast,
-                ]}
-              >
-                <Text style={styles.skinLabel}>{t(row.labelKey)}</Text>
-                <Text style={styles.skinValue}>{t(row.valueKey)}</Text>
-              </View>
-            ))}
+            {(() => {
+              const rows = getSkinProfileRows();
+              return rows.map((row, index) => (
+                <View
+                  key={row.key}
+                  style={[
+                    styles.skinRow,
+                    index === rows.length - 1 && styles.skinRowLast,
+                  ]}
+                >
+                  <Text style={styles.skinLabel}>{t(row.labelKey)}</Text>
+                  <Text style={styles.skinValue}>{row.getValue(profile, t)}</Text>
+                </View>
+              ));
+            })()}
           </View>
         </View>
 
-        <Pressable style={styles.updateButton}>
+        <Pressable style={styles.updateButton} onPress={() => router.push('/skin-profile')}>
           <Pencil size={18} color={Colors.white} />
           <Text style={styles.updateButtonText}>{t('updateProfileSurvey')}</Text>
         </Pressable>

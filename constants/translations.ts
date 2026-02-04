@@ -15,6 +15,7 @@ const translations: TranslationMap = {
   // Language screen
   selectLanguage: { en: 'Select your language', de: 'Wählen Sie Ihre Sprache', es: 'Seleccione su idioma', tr: 'Dilinizi seçin' },
   next: { en: 'Next', de: 'Weiter', es: 'Siguiente', tr: 'İleri' },
+  save: { en: 'Save', de: 'Speichern', es: 'Guardar', tr: 'Kaydet' },
 
   // Login
   login: { en: 'Log in', de: 'Anmelden', es: 'Iniciar sesión', tr: 'Giriş Yap' },
@@ -185,6 +186,31 @@ const translations: TranslationMap = {
   addProductSavedOnly: { en: 'Product added.', de: 'Produkt hinzugefügt.', es: 'Producto añadido.', tr: 'Ürün eklendi.' },
   addProductOk: { en: 'OK', de: 'OK', es: 'OK', tr: 'Tamam' },
   addProductSaveFailed: { en: 'Could not add product.', de: 'Produkt konnte nicht hinzugefügt werden.', es: 'No se pudo añadir el producto.', tr: 'Ürün eklenemedi.' },
+
+  // Onboarding
+  onboardingWelcomeTitle1: { en: 'Your skin has a goal.', de: 'Ihre Haut hat ein Ziel.', es: 'Tu piel tiene un objetivo.', tr: 'Cildinizin bir hedefi var.' },
+  onboardingWelcomeTitle2: { en: 'We have the game plan.', de: 'Wir haben den Plan.', es: 'Nosotros tenemos el plan.', tr: 'Bizim oyun planımız var.' },
+  onboardingLetsGo: { en: "Let's do it!", de: 'Los geht\'s!', es: '¡Hagámoslo!', tr: 'Hadi başlayalım!' },
+  onboardingExistingUser: { en: 'Existing user? ', de: 'Bereits Nutzer? ', es: '¿Ya tiene cuenta? ', tr: 'Zaten üye misiniz? ' },
+  onboardingSignIn: { en: 'Sign in', de: 'Anmelden', es: 'Iniciar sesión', tr: 'Giriş yapın' },
+  onboardingSkinFocus: { en: 'And for your skin, anything specific you want to focus on?', de: 'Gibt es etwas, worauf Sie bei Ihrer Haut besonders achten möchten?', es: '¿Algo específico en lo que quieras enfocarte para tu piel?', tr: 'Cildiniz için özellikle odaklanmak istediğiniz bir şey var mı?' },
+  onboardingConcernAcne: { en: 'Acne breakouts', de: 'Akne-Ausbrüche', es: 'Brotes de acné', tr: 'Sivilce' },
+  onboardingConcernLines: { en: 'Fine lines / Well-aging', de: 'Fältchen / Gutes Altern', es: 'Líneas finas / Envejecer bien', tr: 'İnce çizgiler / Sağlıklı yaşlanma' },
+  onboardingConcernSensitivity: { en: 'Sensitivity', de: 'Empfindlichkeit', es: 'Sensibilidad', tr: 'Hassasiyet' },
+  onboardingConcernRedness: { en: 'Redness', de: 'Rötung', es: 'Enrojecimiento', tr: 'Kızarıklık' },
+  onboardingConcernDryness: { en: 'Dryness / Dehydration', de: 'Trockenheit / Dehydration', es: 'Sequedad / Deshidratación', tr: 'Kuruluk / Dehidrasyon' },
+  onboardingConcernOily: { en: 'Oily skin & shine', de: 'Fettige Haut & Glanz', es: 'Piel grasa y brillos', tr: 'Yağlı cilt ve parlaklık' },
+  onboardingConcernPigmentation: { en: 'Hyperpigmentation', de: 'Hyperpigmentierung', es: 'Hiperpigmentación', tr: 'Hiperpigmentasyon' },
+  onboardingConcernGeneral: { en: 'General skin support', de: 'Allgemeine Hautunterstützung', es: 'Apoyo general para la piel', tr: 'Genel cilt desteği' },
+  onboardingSaveProgress: { en: 'Save your skin progress, settings and more.', de: 'Speichern Sie Ihren Hautfortschritt, Einstellungen und mehr.', es: 'Guarda tu progreso de piel, ajustes y más.', tr: 'Cilt ilerlemenizi, ayarlarınızı ve daha fazlasını kaydedin.' },
+  onboardingContinueGoogle: { en: 'Continue with Google', de: 'Mit Google fortfahren', es: 'Continuar con Google', tr: 'Google ile devam et' },
+  onboardingContinueApple: { en: 'Continue with Apple', de: 'Mit Apple fortfahren', es: 'Continuar con Apple', tr: 'Apple ile devam et' },
+  onboardingContinueEmail: { en: 'Continue with Email', de: 'Mit E-Mail fortfahren', es: 'Continuar con correo', tr: 'E-posta ile devam et' },
+  onboardingTerms: { en: 'By continuing you agree to our ', de: 'Mit dem Fortfahren stimmen Sie unseren ', es: 'Al continuar acepta nuestros ', tr: 'Devam ederek ' },
+  onboardingTermsLink: { en: 'Terms and Conditions', de: 'AGB', es: 'Términos y condiciones', tr: 'Kullanım Koşulları' },
+  onboardingAnd: { en: ' and ', de: ' und ', es: ' y ', tr: ' ve ' },
+  onboardingPrivacyLink: { en: 'Privacy Policy', de: 'Datenschutz', es: 'Política de privacidad', tr: 'Gizlilik Politikası' },
+  onboardingTermsSuffix: { en: '.', de: ' zu.', es: '.', tr: '\'nı kabul etmiş olursunuz.' },
 };
 
 export type TranslationKey = keyof typeof translations;

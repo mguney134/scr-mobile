@@ -12,6 +12,8 @@ import {
 } from 'react-native';
 import { useRouter, Link } from 'expo-router';
 import { supabase } from '../lib/supabase';
+import { ensurePublicUser } from '../lib/users';
+import { getSkinProfile, clearSkinProfile } from '../lib/onboarding';
 import { Colors } from '../constants/Colors';
 import { useLanguage } from '../context/LanguageContext';
 
@@ -54,7 +56,13 @@ export default function RegisterScreen() {
       router.replace('/login');
       return;
     }
-    if (data.session) {
+    if (data.session && data.user) {
+      const profile = await getSkinProfile();
+      await ensurePublicUser(data.user.id, email.trim(), {
+        skin_type: profile?.skin_type ?? null,
+        skin_concerns: profile?.skin_concerns ?? [],
+      });
+      await clearSkinProfile();
       router.replace('/');
     }
   };

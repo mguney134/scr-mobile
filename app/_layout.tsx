@@ -40,6 +40,10 @@ function StackScreens() {
         }}
       />
         <Stack.Screen
+          name="onboarding"
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
           name="language"
           options={{ headerShown: false }}
         />
@@ -57,6 +61,16 @@ function StackScreens() {
           name="products/add"
           options={{
             title: '',
+            headerStyle: { backgroundColor: Colors.headerBackground },
+            headerTintColor: Colors.headerTint,
+            headerTitleStyle: { fontWeight: '600', color: Colors.headerTint },
+            headerBackTitle: t('productsAddBack'),
+          }}
+        />
+        <Stack.Screen
+          name="skin-profile"
+          options={{
+            title: t('skinProfile'),
             headerStyle: { backgroundColor: Colors.headerBackground },
             headerTintColor: Colors.headerTint,
             headerTitleStyle: { fontWeight: '600', color: Colors.headerTint },
